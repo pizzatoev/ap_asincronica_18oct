@@ -5,26 +5,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import java.util.ArrayList;
 import java.util.Random;
-
-
-class Block {
-    Rectangle rect;
-    Color color;
-
-    Block(float x, float y, float width, float height, Color color) {
-        rect = new Rectangle(x, y, width, height);
-        this.color = color;
-    }
-}
-
-
-
 
 public class MainGame extends ApplicationAdapter {
 
@@ -43,11 +30,13 @@ public class MainGame extends ApplicationAdapter {
     private float barX; // posición izquierda de la barra
 
     private boolean gameStarted = false;
-
+    private boolean gameLost = false; // Para distinguir entre inicio y "perdiste"
 
     private BitmapFont font;
     private BitmapFont fontShadow;
     private SpriteBatch batch;
+    private Texture textureEmpezar;
+    private Texture texturePerdiste;
 
 
     private int score = 0; // CONTADOR DE PUNTOS
@@ -80,6 +69,9 @@ public class MainGame extends ApplicationAdapter {
         fontShadow.getData().setScale(font.getData().scaleX); // mismo tamaño
         fontShadow.setColor(new Color(0, 0, 0, 0.5f)); // sombra negra con transparencia
 
+        // Cargar las texturas de las imágenes
+        textureEmpezar = new Texture(Gdx.files.internal("empezar.png"));
+        texturePerdiste = new Texture(Gdx.files.internal("perdiste.png"));
 
     }
 
@@ -88,35 +80,33 @@ public class MainGame extends ApplicationAdapter {
         // Fondo oscuro (#1E2233)
         Gdx.gl.glClearColor(0.11f, 0.13f, 0.2f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-        // Mostrar mensaje de inicio
+        // Mostrar pantalla de inicio o "perdiste"
         if (!gameStarted) {
             batch.begin();
 
-            font.getData().setScale(4.5f);
-            fontShadow.getData().setScale(4.5f);
+            Texture currentTexture = gameLost ? texturePerdiste : textureEmpezar;
+            
+            // Calcular tamaño y posición para centrar la imagen
+            float imgWidth = currentTexture.getWidth();
+            float imgHeight = currentTexture.getHeight();
+            float scaleX = screenWidth / imgWidth;
+            float scaleY = screenHeight / imgHeight;
+            float scale = Math.min(scaleX, scaleY) * 0.95f; // 95% para dejar un poco de margen
+            
+            float scaledWidth = imgWidth * scale;
+            float scaledHeight = imgHeight * scale;
+            float x = (screenWidth - scaledWidth) / 2;
+            float y = (screenHeight - scaledHeight) / 2;
 
-            String title = "¡COLOR DODGE!";
-            float titleWidth = font.getRegion().getRegionWidth() * 0.5f;
-
-            // 🔹 SOMBRA
-            fontShadow.draw(batch, title, screenWidth / 2 - titleWidth + 4, screenHeight * 0.6f - 4);
-            // 🔹 TEXTO PRINCIPAL
-            font.draw(batch, title, screenWidth / 2 - titleWidth, screenHeight * 0.6f);
-
-            font.getData().setScale(3f);
-            fontShadow.getData().setScale(3f);
-            String subtitle = "Toca para empezar - Inclina para mover";
-
-            // 🔹 SOMBRA SUBTÍTULO
-            fontShadow.draw(batch, subtitle, screenWidth * 0.2f + 3, screenHeight * 0.5f - 3);
-            // 🔹 TEXTO PRINCIPAL SUBTÍTULO
-            font.draw(batch, subtitle, screenWidth * 0.2f, screenHeight * 0.5f);
+            // Dibujar la imagen centrada
+            batch.draw(currentTexture, x, y, scaledWidth, scaledHeight);
 
             batch.end();
 
             // Espera a que el jugador toque la pantalla
             if (Gdx.input.justTouched()) {
                 gameStarted = true;
+                gameLost = false; // Resetear el flag de "perdiste"
             }
             return; // Detiene lógica hasta que empiece
         }
@@ -191,15 +181,16 @@ public class MainGame extends ApplicationAdapter {
             if (block.rect.overlaps(new Rectangle(ballX - ballRadius, ballY - ballRadius, ballRadius * 2, ballRadius * 2))) {
 
                 if (block.color.equals(Color.WHITE)) {
-                    // 🚨 Colisión con enemigo → Reiniciar juego
+                    // Colisión con enemigo → Reiniciar juego
                     score = 0;
                     blocks.clear();
                     ballX = screenWidth / 2;
                     gameStarted = false; // Vuelve a pantalla de inicio
+                    gameLost = true; // Marcar que se perdió
                     break;
                 }
                 else {
-                    // ✅ Colisión con bloque verde → sumar y eliminar
+                    // Colisión con bloque verde → sumar y eliminar
                     score++;
                     blockSpeed += 0.2f; // cada vez que sumas, el juego se pone más difícil
                     blocks.remove(i);
@@ -236,10 +227,10 @@ public class MainGame extends ApplicationAdapter {
         String scoreText = String.valueOf(score);
         float scoreWidth = font.getRegion().getRegionWidth() * 0.5f;
 
-        // 🔹 DIBUJAR SOMBRA PRIMERO
+        //DIBUJAR SOMBRA PRIMERO
         fontShadow.draw(batch, scoreText, screenWidth / 2 - scoreWidth + 3, ballY - 80 - 3);
 
-        // 🔹 DIBUJAR TEXTO PRINCIPAL
+        //DIBUJAR TEXTO PRINCIPAL
         font.draw(batch, scoreText, screenWidth / 2 - scoreWidth, ballY - 80);
         batch.end();
 
@@ -253,5 +244,7 @@ public class MainGame extends ApplicationAdapter {
         batch.dispose();
         font.dispose();
         fontShadow.dispose();
+        textureEmpezar.dispose();
+        texturePerdiste.dispose();
     }
 }
