@@ -13,150 +13,177 @@ import com.badlogic.gdx.math.Rectangle;
 import java.util.ArrayList;
 import java.util.Random;
 
+/**
+ * Clase principal del juego Color Dodge
+ * Extiende ApplicationAdapter de LibGDX para crear el juego
+ */
 public class MainGame extends ApplicationAdapter {
 
-    private ShapeRenderer shapeRenderer;
-    private float ballX, ballY;
-    private float ballRadius = 40f;
-    private float speed = 5f;
-    private float screenWidth, screenHeight;
-    private ArrayList<Block> blocks;// Lista de cuadros
-    private float blockWidth = 80, blockHeight = 80;;
-    private float blockSpeed = 7.5f; // Se siente más dinámico
-    private Random random;
-
-    private float barHeight = 30f;  // altura de la barra
-    private float barWidth;        // se ajustará en runtime
-    private float barX; // posición izquierda de la barra
-
-    private boolean gameStarted = false;
-    private boolean gameLost = false; // Para distinguir entre inicio y "perdiste"
-
-    private BitmapFont font;
-    private BitmapFont fontShadow;
-    private SpriteBatch batch;
-    private Texture textureEmpezar;
-    private Texture texturePerdiste;
-
-
-    private int score = 0; // CONTADOR DE PUNTOS
-    private float spawnTimer = 0;
-    private float spawnInterval = 0.8f; // tiempo entre apariciones (0.8s) - Más bloques, más seguido
+    // === COMPONENTES DE RENDERIZADO ===
+    private ShapeRenderer shapeRenderer;  // Para dibujar formas geométricas
+    private SpriteBatch batch;            // Para dibujar imágenes y texto
+    private BitmapFont font;              // Fuente para el texto del score
+    private BitmapFont fontShadow;        // Fuente para la sombra del score
+    
+    // === TEXTURAS (IMÁGENES) ===
+    private Texture textureEmpezar;       // Imagen de pantalla de inicio
+    private Texture texturePerdiste;      // Imagen de pantalla de "perdiste"
+    
+    // === DIMENSIONES DE PANTALLA ===
+    private float screenWidth;
+    private float screenHeight;
+    
+    // === JUGADOR (BOLA) ===
+    private float ballX, ballY;           // Posición de la bola
+    private float ballRadius = 40f;       // Radio de la bola
+    private float speed = 5f;             // Velocidad de movimiento horizontal
+    
+    // === BARRA (PISTA) ===
+    private float barHeight = 30f;        // Altura de la barra
+    private float barWidth;                // Ancho de la barra (se calcula)
+    private float barX;                    // Posición X de la barra
+    
+    // === BLOQUES ===
+    private ArrayList<Block> blocks;      // Lista de bloques en pantalla
+    private float blockWidth = 80;        // Ancho de cada bloque
+    private float blockHeight = 80;       // Alto de cada bloque
+    private float blockSpeed = 7.5f;      // Velocidad de caída de los bloques
+    
+    // === GENERACIÓN DE BLOQUES ===
+    private Random random;                 // Generador de números aleatorios
+    private float spawnTimer = 0;          // Contador de tiempo para generar bloques
+    private float spawnInterval = 0.8f;    // Intervalo entre generación de bloques (segundos)
+    
+    // === ESTADO DEL JUEGO ===
+    private boolean gameStarted = false;  // Indica si el juego ha comenzado
+    private boolean gameLost = false;      // Indica si el jugador perdió
+    private int score = 0;                 // Puntuación del jugador
+    
+    /**
+     * Método llamado una vez al iniciar el juego
+     * Aquí se inicializan todos los componentes necesarios
+     */
     @Override
     public void create() {
-        shapeRenderer = new ShapeRenderer();
-
+        // Obtener dimensiones de la pantalla
         screenWidth = Gdx.graphics.getWidth();
         screenHeight = Gdx.graphics.getHeight();
 
-        barWidth = screenWidth * 0.8f; // 80% del ancho de la pantalla
-        barX = (screenWidth - barWidth) / 2; // posición centrada de la barra
-
-        // Posición inicial al centro
+        // Inicializar componentes de renderizado
+        shapeRenderer = new ShapeRenderer();
+        batch = new SpriteBatch();
+        
+        // Configurar barra (pista donde se mueve la bola)
+        barWidth = screenWidth * 0.8f;  // 80% del ancho de pantalla
+        barX = (screenWidth - barWidth) / 2;  // Centrar la barra
+        
+        // Posición inicial de la bola (centro horizontal, 35% desde arriba)
         ballX = screenWidth / 2;
-        ballY = screenHeight * 0.35f; // bajar la bolita alineada a la barra
-        Gdx.app.log("DEBUG", "Game Started - Acelerómetro listo");
-
+        ballY = screenHeight * 0.35f;
+        
+        // Inicializar lista de bloques y generador aleatorio
         blocks = new ArrayList<>();
         random = new Random();
-
-        batch = new SpriteBatch();
-        font = new BitmapFont(); // fuente por defecto (blanca)
-        font.getData().setScale(7f); // HUD extra grande y grueso
+        
+        // Configurar fuente para el score
+        font = new BitmapFont();
+        font.getData().setScale(7f);  // Tamaño grande
         font.setColor(Color.WHITE);
-
+        
+        // Configurar sombra del score
         fontShadow = new BitmapFont();
-        fontShadow.getData().setScale(font.getData().scaleX); // mismo tamaño
-        fontShadow.setColor(new Color(0, 0, 0, 0.5f)); // sombra negra con transparencia
-
-        // Cargar las texturas de las imágenes
+        fontShadow.getData().setScale(7f);
+        fontShadow.setColor(new Color(0, 0, 0, 0.5f));  // Negro semitransparente
+        
+        // Cargar imágenes de las pantallas
         textureEmpezar = new Texture(Gdx.files.internal("empezar.png"));
         texturePerdiste = new Texture(Gdx.files.internal("perdiste.png"));
-
     }
 
+    /**
+     * Método llamado en cada frame (60 veces por segundo aproximadamente)
+     * Aquí se actualiza la lógica del juego y se dibuja todo
+     */
     @Override
     public void render() {
-        // Fondo oscuro (#1E2233)
+        // Limpiar pantalla con color de fondo oscuro
         Gdx.gl.glClearColor(0.11f, 0.13f, 0.2f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-        // Mostrar pantalla de inicio o "perdiste"
+        
+        // === PANTALLA DE INICIO O "PERDISTE" ===
         if (!gameStarted) {
             batch.begin();
-
+            
+            // Seleccionar imagen según el estado
             Texture currentTexture = gameLost ? texturePerdiste : textureEmpezar;
             
-            // Calcular tamaño y posición para centrar la imagen
+            // Calcular escala para que la imagen quepa en pantalla
             float imgWidth = currentTexture.getWidth();
             float imgHeight = currentTexture.getHeight();
             float scaleX = screenWidth / imgWidth;
             float scaleY = screenHeight / imgHeight;
-            float scale = Math.min(scaleX, scaleY) * 0.95f; // 95% para dejar un poco de margen
+            float scale = Math.min(scaleX, scaleY) * 0.95f;  // 95% para margen
             
+            // Calcular posición centrada
             float scaledWidth = imgWidth * scale;
             float scaledHeight = imgHeight * scale;
             float x = (screenWidth - scaledWidth) / 2;
             float y = (screenHeight - scaledHeight) / 2;
-
-            // Dibujar la imagen centrada
+            
+            // Dibujar imagen
             batch.draw(currentTexture, x, y, scaledWidth, scaledHeight);
-
             batch.end();
-
-            // Espera a que el jugador toque la pantalla
+            
+            // Esperar toque de pantalla para iniciar
             if (Gdx.input.justTouched()) {
                 gameStarted = true;
-                gameLost = false; // Resetear el flag de "perdiste"
+                gameLost = false;
             }
-            return; // Detiene lógica hasta que empiece
+            return;  // No ejecutar el resto del código hasta que empiece
         }
 
-        // Movimiento con FLECHAS (para probar rápido en PC)
+        // === MOVIMIENTO DE LA BOLA ===
+        // Controles con teclado (para probar en desktop)
         if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) ballX -= speed;
         if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) ballX += speed;
-
-        // Movimiento con ACELERÓMETRO
+        
+        // Controles con acelerómetro (en dispositivos Android)
         if (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android) {
-            float accelX = Gdx.input.getAccelerometerX(); // inclinación
-            ballX -= accelX * 2; // Multiplicamos sensibilidad
+            float accelX = Gdx.input.getAccelerometerX();
+            ballX -= accelX * 2;  // Ajustar sensibilidad
         }
-
-        // Limitar dentro de la barra
+        
+        // Limitar movimiento dentro de la barra
         float leftLimit = barX + ballRadius;
         float rightLimit = barX + barWidth - ballRadius;
-
         if (ballX < leftLimit) ballX = leftLimit;
         if (ballX > rightLimit) ballX = rightLimit;
 
-        // Dibujar la barra horizontal detrás de la bola (tipo pista)
+        // === DIBUJAR ELEMENTOS DEL JUEGO ===
+        // Dibujar barra (pista)
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(new Color(0, 0, 0, 0.3f)); // negro con transparencia
-        shapeRenderer.rect(
-            (screenWidth - barWidth) / 2,       // centrado en X
-            ballY - barHeight / 2,             // centrado debajo de la bola
-            barWidth,
-            barHeight
-        );
+        shapeRenderer.setColor(new Color(0, 0, 0, 0.3f));  // Negro semitransparente
+        shapeRenderer.rect(barX, ballY - barHeight / 2, barWidth, barHeight);
         shapeRenderer.end();
-
-        // Dibujar bolita color verde
+        
+        // Dibujar bola
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(Color.valueOf("00E3A4")); // Verde menta
+        shapeRenderer.setColor(Color.valueOf("00E3A4"));  // Verde menta
         shapeRenderer.circle(ballX, ballY, ballRadius);
         shapeRenderer.end();
-
-        // Dibujar y mover cada bloque
+        
+        // Dibujar y mover bloques
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         for (int i = 0; i < blocks.size(); i++) {
             Block block = blocks.get(i);
-
-            // Mover hacia abajo
+            
+            // Mover bloque hacia abajo
             block.rect.y -= blockSpeed;
-
-            // Dibujar bloque con su color
+            
+            // Dibujar bloque
             shapeRenderer.setColor(block.color);
             shapeRenderer.rect(block.rect.x, block.rect.y, block.rect.width, block.rect.height);
-
+            
             // Eliminar bloques que salen de pantalla
             if (block.rect.y + block.rect.height < 0) {
                 blocks.remove(i);
@@ -164,80 +191,78 @@ public class MainGame extends ApplicationAdapter {
             }
         }
         shapeRenderer.end();
-        // Dibujar SCORE tipo "17"
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        Gdx.gl.glLineWidth(3);
-        shapeRenderer.setColor(Color.WHITE);
-        shapeRenderer.end();
-
-        Gdx.graphics.setTitle("Score: " + score); // También muestra score en título (Desktop debug)
-
-
-        // DETECCIÓN DE COLISIONES
+        
+        // Mostrar score en título de ventana (solo desktop)
+        Gdx.graphics.setTitle("Score: " + score);
+        
+        // === DETECCIÓN DE COLISIONES ===
         for (int i = 0; i < blocks.size(); i++) {
             Block block = blocks.get(i);
-
-            // Calcular colisión circular con rectángulo
-            if (block.rect.overlaps(new Rectangle(ballX - ballRadius, ballY - ballRadius, ballRadius * 2, ballRadius * 2))) {
-
+            
+            // Crear rectángulo que representa la bola para detectar colisión
+            Rectangle ballRect = new Rectangle(ballX - ballRadius, ballY - ballRadius, 
+                                                ballRadius * 2, ballRadius * 2);
+            
+            if (block.rect.overlaps(ballRect)) {
                 if (block.color.equals(Color.WHITE)) {
-                    // Colisión con enemigo → Reiniciar juego
+                    // Colisión con bloque blanco (enemigo) → Perder
                     score = 0;
                     blocks.clear();
                     ballX = screenWidth / 2;
-                    gameStarted = false; // Vuelve a pantalla de inicio
-                    gameLost = true; // Marcar que se perdió
+                    gameStarted = false;
+                    gameLost = true;
                     break;
-                }
-                else {
-                    // Colisión con bloque verde → sumar y eliminar
+                } else {
+                    // Colisión con bloque verde → Sumar puntos
                     score++;
-                    blockSpeed += 0.2f; // cada vez que sumas, el juego se pone más difícil
+                    blockSpeed += 0.2f;  // Aumentar dificultad
                     blocks.remove(i);
                     i--;
                 }
             }
         }
-
-
-
-        // Timer para generar bloques
-        spawnTimer += Gdx.graphics.getDeltaTime();
+        
+        // === GENERACIÓN DE BLOQUES ===
+        spawnTimer += Gdx.graphics.getDeltaTime();  // DeltaTime = tiempo entre frames
         if (spawnTimer >= spawnInterval) {
             spawnTimer = 0;
-
-            // GENERAR ENTRE 1 Y 2 BLOQUES ALEATORIOS
-            int blockCount = 1 + random.nextInt(2); // genera 1 o 2 bloques
-
+            
+            // Generar entre 1 y 2 bloques aleatorios
+            int blockCount = 1 + random.nextInt(2);
+            
             for (int i = 0; i < blockCount; i++) {
-                Color blockColor = random.nextFloat() < 0.15f ? Color.valueOf("00E3A4") : Color.WHITE;
-
+                // 15% de probabilidad de bloque verde, 85% de bloque blanco
+                Color blockColor = random.nextFloat() < 0.15f ? 
+                    Color.valueOf("00E3A4") : Color.WHITE;
+                
+                // Crear bloque en posición aleatoria en la parte superior
                 blocks.add(new Block(
                     random.nextInt((int) (screenWidth - blockWidth)),
-                    screenHeight,
+                    screenHeight,  // Aparece arriba de la pantalla
                     blockWidth,
                     blockHeight,
                     blockColor
                 ));
             }
         }
-
-
+        
+        // === DIBUJAR SCORE ===
         batch.begin();
         String scoreText = String.valueOf(score);
         float scoreWidth = font.getRegion().getRegionWidth() * 0.5f;
-
-        //DIBUJAR SOMBRA PRIMERO
+        
+        // Dibujar sombra del score
         fontShadow.draw(batch, scoreText, screenWidth / 2 - scoreWidth + 3, ballY - 80 - 3);
-
-        //DIBUJAR TEXTO PRINCIPAL
+        
+        // Dibujar score principal
         font.draw(batch, scoreText, screenWidth / 2 - scoreWidth, ballY - 80);
         batch.end();
-
-
-
     }
 
+    /**
+     * Método llamado al cerrar el juego
+     * Libera los recursos para evitar fugas de memoria
+     */
     @Override
     public void dispose() {
         shapeRenderer.dispose();
